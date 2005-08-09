@@ -1,5 +1,5 @@
 NAME
-    WWW::Search::Feedster - Search a Bookmarks server via XMLRPC
+    WWW::Search::Feedster - Search Feedster
 
 SYNOPSIS
       use WWW::Search;
@@ -21,6 +21,35 @@ DESCRIPTION
 
     This class exports no public interface; all interaction should be done
     through WWW::Search objects.
+
+Specific searches
+    Aside from generic searches, more specific searches can be performed by
+    setting the `category` modifier and its attributes. Take note of the
+    following examples.
+
+      my $search = WWW::Search->new(
+        'Feedster',
+        category => 'blogs'
+      );
+      ...
+
+    OR
+
+      my $search = WWW::Search->new(
+        'Feedster',
+        category => 'jobs',
+        location => 'California' # Optional
+      );
+      ...
+
+      my $search = WWW::Search->new(
+        'Feedster',
+        category => 'links',
+      );
+      $search->native_query('http://www.feedster.com');
+      ...
+
+    Valid categories include blogs, jobs, feedfinder and links.
 
 AUTHOR
     Nick Gerakines <nick@socklabs.com>

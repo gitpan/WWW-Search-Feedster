@@ -1,7 +1,6 @@
 package WWW::Search::Feedster;
 
 use strict;
-use Carp;
 
 use XML::RSS::LibXML;
 use WWW::Search qw(generic_option);
@@ -11,11 +10,11 @@ use vars qw(@ISA $VERSION);
 no warnings qw(redefine);
 
 @ISA = qw(WWW::Search);
-$VERSION = "0.01";
+$VERSION = "0.02";
 
 =head1 NAME
 
-WWW::Search::Feedster - Search a Bookmarks server via XMLRPC
+WWW::Search::Feedster - Search Feedster
 
 =head1 SYNOPSIS
 
@@ -39,16 +38,47 @@ search results to easily parse and return data.
 This class exports no public interface; all interaction should be done through
 L<WWW::Search> objects.
 
+=head1 Specific searches
+
+Aside from generic searches, more specific searches can be performed by
+setting the `category` modifier and its attributes. Take note of the following
+examples.
+
+  my $search = WWW::Search->new(
+    'Feedster',
+    category => 'blogs'
+  );
+  ...
+
+OR
+
+  my $search = WWW::Search->new(
+    'Feedster',
+    category => 'jobs',
+    location => 'California' # Optional
+  );
+  ...
+
+  my $search = WWW::Search->new(
+    'Feedster',
+    category => 'links',
+  );
+  $search->native_query('http://www.feedster.com');
+  ...
+
+Valid categories include blogs, jobs, feedfinder and links.
+
 =cut
 
 sub native_setup_search {
 	my($self, $query) = @_;
-	
-	$self->user_agent('non-robot');
+
+	$self->user_agent('W3SearchFeedster');
 	$self->{'_next_to_retrieve'} = 0;
+
+	# Set some defaults
 	$self->{search_host} ||= 'http://feedster.com';
 	$self->{search_path} ||= '/search.php';
-
 	my $limit = $self->{limit} || 20;
 	my $sort = $self->{sort} || 'date';
 	my %search_args = (
@@ -59,9 +89,30 @@ sub native_setup_search {
 		hl => '',
 		type => 'rss',
 	);
+
+	# Create the custom search strings if required
+	if ($self->{category} eq 'jobs') {
+		$self->{search_host} = 'http://jobs.feedster.com';
+		$search_args{category} = 'jobs';
+		if ( $self->{location} && $self->{location} ne '' ) {
+			$search_args{q3} = $self->{location};
+		}
+	} elsif ( $self->{category} eq 'blogs') {
+		$search_args{category} = 'blogs';
+		$self->{search_host} = 'http://blogs.feedster.com';
+	} elsif ( $self->{category} eq 'feedfinder' ) {
+		$search_args{db} = 'feeds';
+	} elsif ( $self->{category} eq 'links' ) {
+		%search_args = ( url => $query, limit => $limit, type => 'rss' );
+		$self->{search_host} = 'http://feedster.com';
+		$self->{search_path} = '/links.php';
+	}
+	
+	# Prep the search url
 	$self->{_next_url} =
 		$self->{'search_host'}.$self->{'search_path'}.'?'.
 		join( "&", map { "$_=$search_args{$_}" } keys %search_args );
+
 }
 
 sub native_retrieve_some {
@@ -70,18 +121,11 @@ sub native_retrieve_some {
 	return unless ( defined $self->{_next_url} );
 
 	my ($response) = $self->http_request('GET', $self->{_next_url});
-
 	$self->{response} = $response;
-	
 	return unless ( $response->is_success );
-	
-	my $res_source = $response->content();
-
-	$self->{_next_url} = undef;
-
+	my ($res_source, $hits_found) = ($response->content(), 0);
 	$res_source =~ s!^<\?xml.*\n!!g;
-
-	my $hits_found = 0;
+	$self->{_next_url} = undef;
 
 	if ( $response ) {
 		my $rss = XML::RSS::LibXML->new;
