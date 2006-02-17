@@ -1,9 +1,11 @@
 use strict;
-use Test::More tests => 1;
+use Test::More tests => 4;
 use WWW::Search;
 
 my $search = WWW::Search->new('Feedster');
-$search->native_query('world of warcraft linux');
+ok($search);
+isa_ok($search, 'WWW::Search');
+$search->native_query('gerakines');
 my $result = $search->next_result;
-
 ok($result);
+isa_ok($result, 'WWW::SearchResult');
